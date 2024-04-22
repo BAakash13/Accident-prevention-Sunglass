@@ -1,12 +1,9 @@
-# Accident-prevention-Sunglass
-Arduino code:
-
 #define Relay 13
 #define buzzer A0
 static const int sensorPin = 10;                    // sensor input pin 
-int SensorStatePrevious = LOW;                      // previousstate of the sensor
+int SensorStatePrevious = LOW;                      // previous state of the sensor
 
-unsigned long minSensorDuration = 3000; // Time we wait before  the sensor active as long 
+unsigned long minSensorDuration = 3000; // Time we wait before the sensor active as long 
 unsigned long minSensorDuration2 = 6000;
 unsigned long SensorLongMillis;                // Time in ms when the sensor was active
 bool SensorStateLongTime = false;                  // True if it is a long active
@@ -16,78 +13,68 @@ unsigned long previousSensorMillis;                 // Timestamp of the latest r
 
 unsigned long SensorOutDuration;                  // Time the sensor is active in ms
 
-//// GENERAL ////
-
-unsigned long currentMillis;          // Variabele to store the number of milleseconds since the Arduino has started
+unsigned long currentMillis;          // Variable to store the number of milliseconds since the Arduino has started
 
 void setup() {
-  Serial.begin(9600);                 // Initialise the serial monitor
+  Serial.begin(9600);                 // Initialize the serial monitor
 
-  pinMode(sensorPin, INPUT);          // set sensorPin as input
-  Serial.println("Press button");
-  pinMode(Relay,OUTPUT);
-  pinMode(buzzer,OUTPUT);
+  pinMode(sensorPin, INPUT);          // Set sensorPin as input
+  pinMode(Relay, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+  
+  // GSM Module setup
+  Serial.begin(9600);   // Setting the baud rate of GSM Module  
+  delay(100);
 }
 
-// Function for reading the sensor state
 void readSensorState() {
+  if (currentMillis - previousSensorMillis > intervalSensor) {
+    int SensorState = digitalRead(sensorPin);
 
-  // If the difference in time between the previous reading is larger than intervalsensor
-  if(currentMillis - previousSensorMillis > intervalSensor) {
-    
-    // Read the digital value of the sensor (LOW/HIGH)
-    int SensorState = digitalRead(sensorPin);    
-
-    // If the button has been active AND
-    // If the sensor wasn't activated before AND
-    // IF there was not already a measurement running to determine how long the sensor has been activated
     if (SensorState == LOW && SensorStatePrevious == HIGH && !SensorStateLongTime) {
-     SensorLongMillis = currentMillis;
-       SensorStatePrevious = LOW;
-      
+      SensorLongMillis = currentMillis;
+      SensorStatePrevious = LOW;
       Serial.println("Button pressed");
     }
 
-    // Calculate how long the sensor has been activated
-   SensorOutDuration = currentMillis - SensorLongMillis;
+    SensorOutDuration = currentMillis - SensorLongMillis;
 
-    // If the button is active AND
-    // If there is no measurement running to determine how long the sensor is active AND
-    // If the time the sensor has been activated is larger or equal to the time needed for a long active
     if (SensorState == LOW && !SensorStateLongTime && SensorOutDuration >= minSensorDuration) {
       SensorStateLongTime = true;
-      digitalWrite(Relay,HIGH);
+      digitalWrite(Relay, HIGH);
       Serial.println("Button long pressed");
+      
+      // GSM Module message sending
+      Serial.println("AT+CMGF=1");    // Sets the GSM Module in Text Mode
+      delay(1000);  // Delay of 1000 milliseconds or 1 second
+      Serial.println("AT+CMGS=\"+91########\"\r"); // Replace x with mobile number
+      delay(1000);
+      Serial.println("Eyeblink detected - Check immediately!");  // The SMS text you want to send
+      delay(100);
+      Serial.println((char)26);  // ASCII code of CTRL+Z
+      delay(1000);
     }
+
     if (SensorState == LOW && SensorStateLongTime && SensorOutDuration >= minSensorDuration2) {
-     SensorStateLongTime = true;
-      digitalWrite(buzzer,HIGH);
+      SensorStateLongTime = true;
+      digitalWrite(buzzer, HIGH);
       delay(1000);
       Serial.println("Button long pressed");
     }
-      
-    // If the sensor is released AND
-    // If the sensor was activated before
+
     if (SensorState == HIGH && SensorStatePrevious == LOW) {
       SensorStatePrevious = HIGH;
       SensorStateLongTime = false;
-      digitalWrite(Relay,LOW);
-      digitalWrite(buzzer,LOW);
+      digitalWrite(Relay, LOW);
+      digitalWrite(buzzer, LOW);
       Serial.println("Button released");
-
-  
     }
-    
-    // store the current timestamp in previousSensorMillis
-   previousSensorMillis = currentMillis;
 
+    previousSensorMillis = currentMillis;
   }
-
 }
 
 void loop() {
-
-  currentMillis = millis();    // store the current time
-  readSensorState();           // read the sensor state
-  
+  currentMillis = millis();    // Store the current time
+  readSensorState();           // Read the sensor state
 }
